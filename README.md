@@ -182,6 +182,9 @@ python -m pytest tests/
 # Verificar cobertura
 python -m pytest --cov=src tests/
 ```
+## Arquivo de Dados Processados
+O sistema utiliza um arquivo de embeddings pré-processados armazenado no Google Drive:
+🔗 Link direto: https://drive.google.com/file/d/1172CYnyderbEHOzdfjXJ1dWfglKvzW-e/view?usp=drive_link
 
 ## Documentação Adicional
 
