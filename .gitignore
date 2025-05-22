@@ -1,0 +1,123 @@
+# Decision Recruiter - Arquivos Ignorados pelo Git
+
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# === VIRTUAL ENVIRONMENTS ===
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+
+# === JUPYTER NOTEBOOKS ===
+.ipynb_checkpoints/
+*.ipynb
+
+# === DADOS GRANDES ===
+*.pkl
+*.pickle
+*.json
+*.csv
+*.xlsx
+*.xls
+data/raw/
+data/processed/
+resultados_intermediarios/
+
+# === MODELOS TREINADOS ===
+models/
+embeddings/
+*.model
+*.bin
+
+# === LOGS ===
+*.log
+logs/
+*.out
+
+# === SISTEMA OPERACIONAL ===
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# === IDEs ===
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# === STREAMLIT ===
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# === CONFIGURAÇÕES LOCAIS ===
+config.local.py
+.env
+.env.local
+.env.production
+secrets.py
+
+# === CACHE ===
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === TEMPORÁRIOS ===
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# === OUTROS ===
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
