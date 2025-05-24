@@ -5,10 +5,21 @@ import plotly.express as px
 import plotly.graph_objects as go
 import re
 import io
-import pinecone
-from pinecone import Pinecone, ServerlessSpec
 import pickle
 import os
+
+# Importar Pinecone de forma compatível com Streamlit Cloud
+try:
+    import pinecone
+    from pinecone import Pinecone, ServerlessSpec
+    PINECONE_AVAILABLE = True
+except ImportError:
+    try:
+        import pinecone
+        PINECONE_AVAILABLE = True
+    except ImportError:
+        st.error("❌ Pinecone não está disponível. Verifique o requirements.txt")
+        PINECONE_AVAILABLE = False
 
 # Configuração da página
 st.set_page_config(
@@ -209,41 +220,94 @@ def merge_technical_knowledge(conhecimentos_tecnicos, conhecimentos_extraidos):
     else:
         return "N/A"
 
-# === CONFIGURAÇÃO DO PINECONE ===
 @st.cache_resource
 def init_pinecone():
     """Inicializa conexão com Pinecone usando a sintaxe que funcionou"""
+    if not PINECONE_AVAILABLE:
+        st.error("❌ Pinecone não está disponível")
+        return None
+        
     try:
         # Mesma configuração que funcionou no upload
         API_KEY = "pcsk_5DfEc5_JTj7W19EkqEm2awJNed9dnmdfNtKBuNv3MNzPnX9R2tJv3dRNbUEJcm9gXWNYko"
         
-        # Inicializar Pinecone (sintaxe 7.0.1 - igual ao upload)
-        pc = Pinecone(api_key=API_KEY)
-        
-        # Conectar ao índice existente
-        index_name = "decision-recruiter"
-        index = pc.Index(index_name)
-        
-        return index
+        # Tentar sintaxe nova primeiro (7.0.1)
+        try:
+            pc = Pinecone(api_key=API_KEY)
+            index = pc.Index("decision-recruiter")
+            return index
+        except:
+            # Fallback para sintaxe antiga (2.2.4)
+            pinecone.init(api_key=API_KEY, environment="us-east-1")
+            index = pinecone.Index("decision-recruiter")
+            return index
+            
     except Exception as e:
         st.error(f"❌ Erro ao conectar no Pinecone: {e}")
         return None
 
 @st.cache_data
 def load_local_metadata():
-    """Carrega metadados locais (dados das vagas e candidatos processados)"""
+    """Carrega metadados locais - No Streamlit Cloud, usa dados mock"""
     try:
-        # Caminho para arquivo local com metadados (mesmo do upload)
-        metadata_path = r"C:\Users\glynd\decision_embeddings_enhanced_precisao.pkl"
+        # Para Streamlit Cloud, vamos criar dados mock mínimos
+        # Em produção, você colocaria os metadados em um arquivo menor
         
-        with open(metadata_path, 'rb') as f:
-            data = pickle.load(f)
+        # Dados mock para demonstração
+        mock_jobs = {
+            "5185": {
+                "titulo": "Operation Lead - Cloud Infrastructure",
+                "cliente": "Morris, Moran and Dodson",
+                "empresa": "Decision São Paulo",
+                "tipo_contratacao": "CLT Full",
+                "cidade": "São Paulo",
+                "estado": "São Paulo",
+                "pais": "Brasil",
+                "localizacao": "São Paulo São Paulo Brasil",
+                "nivel_profissional": "Sênior",
+                "nivel_academico": "Ensino Superior Completo",
+                "nivel_ingles": "Avançado",
+                "nivel_espanhol": "Fluente",
+                "areas_atuacao": "TI - Sistemas e Ferramentas",
+                "principais_atividades": "Operations Lead - Cloud Infrastructure Management",
+                "competencias": "AWS, SAP BASIS, SQL, Oracle, Cloud Infrastructure",
+                "keywords": ["aws", "sql", "oracle", "cloud", "infrastructure", "sap"]
+            }
+        }
+        
+        mock_applicants = {
+            "31000": {
+                "nome": "Carolina Aparecida",
+                "codigo": "31000",
+                "email": "carolina_aparecida@gmail.com",
+                "telefone": "(11) 97048-2708",
+                "cidade": "Itapecerica da Serra",
+                "estado": "São Paulo",
+                "pais": "Brasil",
+                "localizacao": "Itapecerica da Serra São Paulo Brasil",
+                "nivel_profissional": "Pleno",
+                "nivel_academico": "Ensino Superior Completo",
+                "nivel_ingles": "Intermediário",
+                "nivel_espanhol": "Básico",
+                "conhecimentos_tecnicos": "Excel, SQL, Sistemas ERP",
+                "conhecimentos_tecnicos_extraidos": "excel, sql, erp, totvs, navision",
+                "keywords": ["excel", "sql", "erp", "totvs", "navision"],
+                "cv": "Assistente administrativo com experiência em sistemas ERP, Excel avançado e SQL básico. Formação em Ciências Contábeis."
+            }
+        }
+        
+        mock_hired = {
+            "5185": ["31000"]  # Carolina foi contratada para a vaga 5185
+        }
+        
+        st.info("📊 Usando dados de demonstração. Em produção, carregue seus dados reais.")
         
         return {
-            'processed_jobs': data['processed_jobs'],
-            'processed_applicants': data['processed_applicants'],
-            'hired_candidates': data.get('hired_candidates', {})
+            'processed_jobs': mock_jobs,
+            'processed_applicants': mock_applicants,
+            'hired_candidates': mock_hired
         }
+        
     except Exception as e:
         st.error(f"❌ Erro ao carregar metadados: {e}")
         return None
