@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import re
 import io
 import os
+import json
 
 # Importar Pinecone usando a sintaxe que funcionou
 import pinecone
@@ -224,7 +225,103 @@ def init_pinecone():
         st.error(f"❌ Erro ao conectar no Pinecone: {e}")
         return None
 
-def load_static_data():
+@st.cache_data
+def load_complete_data():
+    """Carrega dados COMPLETOS de vagas e candidatos do GitHub Releases"""
+    try:
+        import requests
+        
+        # URL do GitHub Releases
+        url = "https://github.com/guilcalazans/decision/releases/download/v1.0/complete_data.json"
+        
+        with st.status("📥 Baixando dados completos do GitHub Releases..."):
+            st.write("🔗 Conectando ao GitHub...")
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            
+            st.write("📊 Processando dados...")
+            data = response.json()
+            
+            st.write("✅ Dados carregados com sucesso!")
+            
+        return data
+        
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Erro ao baixar do GitHub: {e}")
+        st.info("🔄 Usando dados de demonstração...")
+        return load_demo_data()
+    except Exception as e:
+        st.error(f"❌ Erro ao processar dados: {e}")
+        st.info("🔄 Usando dados de demonstração...")
+        return load_demo_data()
+
+def load_demo_data():
+    """Dados de demonstração como fallback"""
+    return {
+        "jobs": {
+            "5185": {
+                "titulo": "Operation Lead - Cloud Infrastructure",
+                "cliente": "Morris, Moran and Dodson",
+                "empresa": "Decision São Paulo",
+                "tipo_contratacao": "CLT Full",
+                "cidade": "São Paulo",
+                "estado": "São Paulo",
+                "pais": "Brasil",
+                "localizacao": "São Paulo São Paulo Brasil",
+                "nivel_profissional": "Sênior",
+                "nivel_academico": "Ensino Superior Completo",
+                "nivel_ingles": "Avançado",
+                "nivel_espanhol": "Fluente",
+                "areas_atuacao": "TI - Sistemas e Ferramentas",
+                "principais_atividades": """Operations Lead
+
+Roles & Responsibilities:
+• The Operations Manager is accountable for delivering the run services towards a client or a specific set of clients.
+• Responsible for the delivery of the services from multiple Service Lines.
+• Operations Manager ensures that the services are deliver according to the SLA.
+
+Delivery:
+• Deliver services according to SLA.
+• Day-to-day management of all service delivery activities.
+• Manage Major Incidents / client alerts.
+• Drive the identification of operational cost & efficiency savings.""",
+                "competencias": """Required Skills:
+• Prior experience in Cloud Infrastructure Management technologies AWS, SAP BASIS, SQL, Oracle etc
+• Experience in the delivery of customer services to expected SLAs.
+• Good delegation skills, negotiation skills and people management.
+• Leadership abilities - mainly during crisis and major incidents.""",
+                "keywords": ["aws", "sap", "basis", "sql", "oracle", "cloud", "infrastructure", "sla", "leadership"],
+                "demais_observacoes": "100% Remoto Período – entre 5 – 6 meses",
+                "viagens_requeridas": "",
+                "equipamentos_necessarios": "Nenhum"
+            }
+        },
+        "candidates": {
+            "24825": {
+                "nome": "Srta. Ana Lívia da Cruz",
+                "codigo": "24825",
+                "email": "srta._ana_livia_da_cruz@hotmail.com",
+                "telefone": "(11) 99999-0001",
+                "cidade": "São Paulo",
+                "estado": "São Paulo",
+                "pais": "Brasil",
+                "localizacao": "São Paulo São Paulo Brasil",
+                "nivel_profissional": "Pleno",
+                "nivel_academico": "Ensino Superior Completo",
+                "nivel_ingles": "Intermediário",
+                "nivel_espanhol": "Básico",
+                "conhecimentos_tecnicos": "Office, Excel Avançado, SAP, Gestão de Projetos",
+                "conhecimentos_tecnicos_extraidos": "office, excel, sap, gestao, backoffice, projetos",
+                "keywords": ["office", "excel", "sap", "gestao", "backoffice", "projetos"],
+                "cv": "Profissional com 6 anos de experiência em backoffice e gestão administrativa. Expertise em processos, SAP, Excel avançado e coordenação de equipes. Formação em Administração de Empresas com especialização em Gestão de Projetos.",
+                "data_criacao": "15-08-2021 14:30:22",
+                "objetivo_profissional": "Busco oportunidades em gestão de operações e coordenação de projetos."
+            }
+        },
+        "hired_candidates": {
+            "5185": ["24825"]
+        }
+    }
     """Carrega dados estáticos para demonstração - sem pickle"""
     
     # Dados de vagas (exemplo expandido)
@@ -746,6 +843,12 @@ def main():
     if not index:
         st.stop()
     
+    # Carregar dados COMPLETOS (vagas + candidatos)
+    complete_data = load_complete_data()
+    jobs_data = complete_data.get('jobs', {})
+    candidates_data = complete_data.get('candidates', {})
+    hired_candidates = complete_data.get('hired_candidates', {})
+    
     # Buscar todas as vagas do Pinecone
     st.info("🔍 Carregando vagas do Pinecone...")
     all_jobs = get_all_jobs_from_pinecone(index)
@@ -755,6 +858,8 @@ def main():
         st.stop()
     
     st.success(f"✅ {len(all_jobs)} vagas carregadas do Pinecone!")
+    st.info(f"📊 {len(jobs_data)} vagas com dados completos disponíveis")
+    st.info(f"👥 {len(candidates_data)} candidatos com dados completos disponíveis")
     
     # Criar opções de vagas baseadas nos dados do Pinecone
     job_options = {}
@@ -781,10 +886,34 @@ def main():
                 st.rerun()
     
     if selected_job_id:
-        # Buscar dados da vaga selecionada no Pinecone
-        selected_job = all_jobs.get(selected_job_id, {})
+        # Combinar dados da vaga: Pinecone + dados completos
+        pinecone_job = all_jobs.get(selected_job_id, {})
+        complete_job = jobs_data.get(selected_job_id, {})
         
-        # Renderizar detalhes da vaga (usando dados do Pinecone)
+        # Usar dados completos quando disponíveis, senão usar Pinecone
+        selected_job = {
+            'titulo': complete_job.get('titulo', pinecone_job.get('titulo', 'N/A')),
+            'cliente': complete_job.get('cliente', pinecone_job.get('cliente', 'N/A')),
+            'empresa': complete_job.get('empresa', 'N/A'),
+            'tipo_contratacao': complete_job.get('tipo_contratacao', 'N/A'),
+            'cidade': complete_job.get('cidade', pinecone_job.get('cidade', 'N/A')),
+            'estado': complete_job.get('estado', pinecone_job.get('estado', 'N/A')),
+            'pais': complete_job.get('pais', 'Brasil'),
+            'localizacao': complete_job.get('localizacao', f"{pinecone_job.get('cidade', '')} {pinecone_job.get('estado', '')} Brasil"),
+            'nivel_profissional': complete_job.get('nivel_profissional', 'N/A'),
+            'nivel_academico': complete_job.get('nivel_academico', 'N/A'),
+            'nivel_ingles': complete_job.get('nivel_ingles', 'N/A'),
+            'nivel_espanhol': complete_job.get('nivel_espanhol', 'N/A'),
+            'areas_atuacao': complete_job.get('areas_atuacao', 'N/A'),
+            'principais_atividades': complete_job.get('principais_atividades', 'N/A'),
+            'competencias': complete_job.get('competencias', 'N/A'),
+            'keywords': complete_job.get('keywords', []),
+            'demais_observacoes': complete_job.get('demais_observacoes', ''),
+            'viagens_requeridas': complete_job.get('viagens_requeridas', ''),
+            'equipamentos_necessarios': complete_job.get('equipamentos_necessarios', '')
+        }
+        
+        # Renderizar detalhes da vaga (agora com dados completos)
         render_job_details(selected_job)
         
         # Buscar candidatos no Pinecone
@@ -804,23 +933,27 @@ def main():
             candidate_name = candidate_metadata.get('nome', 'Nome não disponível')
             similarity_score = result['score']
             
-            # Usar os metadados do Pinecone como dados do candidato
+            # Combinar dados do Pinecone com dados complementares
+            pinecone_data = candidate_metadata
+            complement_data = candidates_data.get(candidate_id, {})
+            
+            # Usar dados complementares quando disponíveis, senão usar Pinecone
             applicant_data = {
-                'nome': candidate_name,
-                'codigo': candidate_id,
-                'email': candidate_metadata.get('email', 'N/A'),
-                'telefone': candidate_metadata.get('telefone', 'N/A'),
-                'cidade': candidate_metadata.get('cidade', 'N/A'),
-                'estado': candidate_metadata.get('estado', 'N/A'),
-                'localizacao': f"{candidate_metadata.get('cidade', '')} {candidate_metadata.get('estado', '')} Brasil",
-                'nivel_profissional': candidate_metadata.get('nivel_profissional', 'N/A'),
-                'nivel_academico': candidate_metadata.get('nivel_academico', 'N/A'),
-                'nivel_ingles': candidate_metadata.get('nivel_ingles', 'N/A'),
-                'nivel_espanhol': candidate_metadata.get('nivel_espanhol', 'N/A'),
-                'conhecimentos_tecnicos': candidate_metadata.get('keywords', 'N/A'),
-                'conhecimentos_tecnicos_extraidos': '',
-                'keywords': candidate_metadata.get('keywords', '').split(',') if candidate_metadata.get('keywords') else [],
-                'cv': f"Candidato ID: {candidate_id}. Perfil compatível com a vaga baseado em análise de similaridade semântica."
+                'nome': complement_data.get('nome', pinecone_data.get('nome', 'Nome não disponível')),
+                'codigo': complement_data.get('codigo', candidate_id),
+                'email': complement_data.get('email', pinecone_data.get('email', 'N/A')),
+                'telefone': complement_data.get('telefone', 'N/A'),
+                'cidade': complement_data.get('cidade', pinecone_data.get('cidade', 'N/A')),
+                'estado': complement_data.get('estado', pinecone_data.get('estado', 'N/A')),
+                'localizacao': f"{complement_data.get('cidade', pinecone_data.get('cidade', ''))} {complement_data.get('estado', pinecone_data.get('estado', ''))} Brasil",
+                'nivel_profissional': complement_data.get('nivel_profissional', 'N/A'),
+                'nivel_academico': complement_data.get('nivel_academico', 'N/A'),
+                'nivel_ingles': complement_data.get('nivel_ingles', 'N/A'),
+                'nivel_espanhol': complement_data.get('nivel_espanhol', 'N/A'),
+                'conhecimentos_tecnicos': complement_data.get('conhecimentos_tecnicos', 'N/A'),
+                'conhecimentos_tecnicos_extraidos': complement_data.get('conhecimentos_tecnicos_extraidos', ''),
+                'keywords': complement_data.get('keywords', []),
+                'cv': complement_data.get('cv', f"Candidato ID: {candidate_id}. Dados limitados disponíveis.")
             }
             
             # Calcular scores detalhados
@@ -841,8 +974,8 @@ def main():
                 match_details['spanish_level'] * 0.025
             )
             
-            # Para demonstração, simular alguns candidatos contratados
-            is_hired = (hash(candidate_id) % 10) < 2  # ~20% dos candidatos "contratados"
+            # Para demonstração, usar dados reais de contratações
+            is_hired = candidate_id in hired_candidates.get(selected_job_id, [])
             
             similarities.append({
                 'id': candidate_id,
@@ -853,14 +986,16 @@ def main():
                 'match_details': match_details
             })
         
-        # Verificar candidatos contratados (simulado)
+        # Verificar candidatos contratados (com dados reais)
         hired_ids = [item['id'] for item in similarities if item['is_hired']]
         
         if hired_ids:
-            st.success(f"🎯 Demonstração: {len(hired_ids)} candidatos simulados como 'já contratados' entre os 7 recomendados!")
+            hired_names = [item['nome'] for item in similarities if item['is_hired']]
+            st.success(f"🎯 Sistema identificou {len(hired_ids)} candidatos já contratados para esta vaga!")
+            st.write(f"**Candidatos contratados encontrados:** {', '.join(hired_names)}")
         
         st.markdown("## Candidatos Recomendados pelo Pinecone")
-        st.markdown("💡 **Resultados baseados em busca vetorial semântica**")
+        st.markdown("💡 **Resultados baseados em busca vetorial semântica + dados completos**")
         
         # Gerenciar seleção de candidato
         session_key = f"selected_candidate_{selected_job_id}"
