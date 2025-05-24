@@ -17,7 +17,7 @@ st.markdown("Insira um vetor de exemplo (ou use um aleatório):")
 use_random = st.checkbox("Usar vetor aleatório", value=True)
 
 if use_random:
-    query_vector = np.random.rand(768).tolist()  # Supondo vetores de 768 dimensões
+    query_vector = np.random.rand(512).tolist()  # Supondo vetores de 768 dimensões
 else:
     vector_str = st.text_area("Cole aqui seu vetor (valores separados por vírgula)", height=150)
     try:
