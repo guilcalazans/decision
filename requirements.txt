@@ -1,3 +1,7 @@
+# Requirements para Streamlit Cloud - Decision Recruiter com Pinecone
+pinecone-client==2.2.4
+
+tqdm==4.66.1
 altair==5.5.0
 attrs==25.3.0
 beautifulsoup4==4.13.4
