@@ -5,7 +5,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import re
 import io
-import pickle
 import os
 
 # Importar Pinecone de forma compatível com Streamlit Cloud
@@ -246,71 +245,173 @@ def init_pinecone():
         st.error(f"❌ Erro ao conectar no Pinecone: {e}")
         return None
 
-@st.cache_data
-def load_local_metadata():
-    """Carrega metadados locais - No Streamlit Cloud, usa dados mock"""
-    try:
-        # Para Streamlit Cloud, vamos criar dados mock mínimos
-        # Em produção, você colocaria os metadados em um arquivo menor
-        
-        # Dados mock para demonstração
-        mock_jobs = {
-            "5185": {
-                "titulo": "Operation Lead - Cloud Infrastructure",
-                "cliente": "Morris, Moran and Dodson",
-                "empresa": "Decision São Paulo",
-                "tipo_contratacao": "CLT Full",
-                "cidade": "São Paulo",
-                "estado": "São Paulo",
-                "pais": "Brasil",
-                "localizacao": "São Paulo São Paulo Brasil",
-                "nivel_profissional": "Sênior",
-                "nivel_academico": "Ensino Superior Completo",
-                "nivel_ingles": "Avançado",
-                "nivel_espanhol": "Fluente",
-                "areas_atuacao": "TI - Sistemas e Ferramentas",
-                "principais_atividades": "Operations Lead - Cloud Infrastructure Management",
-                "competencias": "AWS, SAP BASIS, SQL, Oracle, Cloud Infrastructure",
-                "keywords": ["aws", "sql", "oracle", "cloud", "infrastructure", "sap"]
-            }
+def load_static_data():
+    """Carrega dados estáticos para demonstração - sem pickle"""
+    
+    # Dados de vagas (exemplo expandido)
+    jobs_data = {
+        "5185": {
+            "titulo": "Operation Lead - Cloud Infrastructure",
+            "cliente": "Morris, Moran and Dodson",
+            "empresa": "Decision São Paulo",
+            "tipo_contratacao": "CLT Full",
+            "cidade": "São Paulo",
+            "estado": "São Paulo",
+            "pais": "Brasil",
+            "localizacao": "São Paulo São Paulo Brasil",
+            "nivel_profissional": "Sênior",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Avançado",
+            "nivel_espanhol": "Fluente",
+            "areas_atuacao": "TI - Sistemas e Ferramentas",
+            "principais_atividades": "Operations Lead - Responsável pela entrega de serviços cloud, gerenciamento de infraestrutura AWS, coordenação com fornecedores e terceiros.",
+            "competencias": "AWS, SAP BASIS, SQL, Oracle, Cloud Infrastructure Management, SLA Management",
+            "keywords": ["aws", "sql", "oracle", "cloud", "infrastructure", "sap", "basis"]
+        },
+        "5186": {
+            "titulo": "Desenvolvedor Python Sênior",
+            "cliente": "Tech Solutions Corp",
+            "empresa": "Decision Rio",
+            "tipo_contratacao": "CLT Full",
+            "cidade": "Rio de Janeiro",
+            "estado": "Rio de Janeiro", 
+            "pais": "Brasil",
+            "localizacao": "Rio de Janeiro Rio de Janeiro Brasil",
+            "nivel_profissional": "Sênior",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Intermediário",
+            "nivel_espanhol": "Básico",
+            "areas_atuacao": "TI - Desenvolvimento",
+            "principais_atividades": "Desenvolvimento de aplicações Python, APIs REST, integração com bancos de dados, metodologias ágeis.",
+            "competencias": "Python, Django, Flask, PostgreSQL, Docker, Git, APIs REST",
+            "keywords": ["python", "django", "flask", "postgresql", "docker", "git", "api", "rest"]
+        },
+        "5187": {
+            "titulo": "Analista de Dados Pleno",
+            "cliente": "DataCorp Analytics",
+            "empresa": "Decision BH",
+            "tipo_contratacao": "PJ",
+            "cidade": "Belo Horizonte",
+            "estado": "Minas Gerais",
+            "pais": "Brasil", 
+            "localizacao": "Belo Horizonte Minas Gerais Brasil",
+            "nivel_profissional": "Pleno",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Intermediário",
+            "nivel_espanhol": "Básico",
+            "areas_atuacao": "TI - Business Intelligence",
+            "principais_atividades": "Análise de dados, criação de dashboards, SQL avançado, Python para análise, Power BI.",
+            "competencias": "SQL, Python, Power BI, Excel, Tableau, Estatística",
+            "keywords": ["sql", "python", "powerbi", "excel", "tableau", "estatistica", "dados"]
         }
-        
-        mock_applicants = {
-            "31000": {
-                "nome": "Carolina Aparecida",
-                "codigo": "31000",
-                "email": "carolina_aparecida@gmail.com",
-                "telefone": "(11) 97048-2708",
-                "cidade": "Itapecerica da Serra",
-                "estado": "São Paulo",
-                "pais": "Brasil",
-                "localizacao": "Itapecerica da Serra São Paulo Brasil",
-                "nivel_profissional": "Pleno",
-                "nivel_academico": "Ensino Superior Completo",
-                "nivel_ingles": "Intermediário",
-                "nivel_espanhol": "Básico",
-                "conhecimentos_tecnicos": "Excel, SQL, Sistemas ERP",
-                "conhecimentos_tecnicos_extraidos": "excel, sql, erp, totvs, navision",
-                "keywords": ["excel", "sql", "erp", "totvs", "navision"],
-                "cv": "Assistente administrativo com experiência em sistemas ERP, Excel avançado e SQL básico. Formação em Ciências Contábeis."
-            }
+    }
+    
+    # Dados de candidatos (exemplo expandido)
+    applicants_data = {
+        "31000": {
+            "nome": "Carolina Aparecida Santos",
+            "codigo": "31000",
+            "email": "carolina_aparecida@gmail.com",
+            "telefone": "(11) 97048-2708",
+            "cidade": "São Paulo",
+            "estado": "São Paulo",
+            "pais": "Brasil",
+            "localizacao": "São Paulo São Paulo Brasil",
+            "nivel_profissional": "Pleno",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Intermediário",
+            "nivel_espanhol": "Básico",
+            "conhecimentos_tecnicos": "Excel, SQL, Sistemas ERP, Contabilidade",
+            "conhecimentos_tecnicos_extraidos": "excel, sql, erp, totvs, navision, contabilidade",
+            "keywords": ["excel", "sql", "erp", "totvs", "navision", "contabilidade"],
+            "cv": "Assistente administrativo com 8 anos de experiência em departamentos financeiro e contábil. Expertise em Excel avançado, SQL básico, sistemas ERP (TOTVS, Navision). Formação em Ciências Contábeis. Experiência com indicadores KPIs, relatórios gerenciais e fechamento contábil."
+        },
+        "31001": {
+            "nome": "João Silva Oliveira",
+            "codigo": "31001", 
+            "email": "joao.silva@email.com",
+            "telefone": "(11) 98765-4321",
+            "cidade": "São Paulo",
+            "estado": "São Paulo",
+            "pais": "Brasil",
+            "localizacao": "São Paulo São Paulo Brasil",
+            "nivel_profissional": "Sênior",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Avançado",
+            "nivel_espanhol": "Intermediário",
+            "conhecimentos_tecnicos": "AWS, Python, Docker, Kubernetes, SQL",
+            "conhecimentos_tecnicos_extraidos": "aws, python, docker, kubernetes, sql, devops, cloud",
+            "keywords": ["aws", "python", "docker", "kubernetes", "sql", "devops", "cloud"],
+            "cv": "Engenheiro DevOps com 10 anos de experiência em cloud computing. Especialista em AWS, Docker, Kubernetes, Python. Experiência com arquiteturas distribuídas, CI/CD, monitoramento e automação de infraestrutura. Certificações AWS Solutions Architect e DevOps Engineer."
+        },
+        "31002": {
+            "nome": "Maria Fernanda Costa",
+            "codigo": "31002",
+            "email": "maria.costa@email.com", 
+            "telefone": "(21) 99888-7777",
+            "cidade": "Rio de Janeiro",
+            "estado": "Rio de Janeiro",
+            "pais": "Brasil",
+            "localizacao": "Rio de Janeiro Rio de Janeiro Brasil",
+            "nivel_profissional": "Sênior",
+            "nivel_academico": "Mestrado",
+            "nivel_ingles": "Fluente",
+            "nivel_espanhol": "Avançado",
+            "conhecimentos_tecnicos": "Python, Django, PostgreSQL, Redis, Git",
+            "conhecimentos_tecnicos_extraidos": "python, django, postgresql, redis, git, web, backend",
+            "keywords": ["python", "django", "postgresql", "redis", "git", "web", "backend"],
+            "cv": "Desenvolvedora Python Sênior com 12 anos de experiência. Especialista em Django, Flask, desenvolvimento de APIs REST, arquitetura de microsserviços. Mestrado em Ciência da Computação. Experiência em liderança técnica e mentoria de equipes."
+        },
+        "31003": {
+            "nome": "Pedro Henrique Alves",
+            "codigo": "31003",
+            "email": "pedro.alves@email.com",
+            "telefone": "(31) 97777-8888",
+            "cidade": "Belo Horizonte", 
+            "estado": "Minas Gerais",
+            "pais": "Brasil",
+            "localizacao": "Belo Horizonte Minas Gerais Brasil",
+            "nivel_profissional": "Pleno",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Intermediário",
+            "nivel_espanhol": "Básico",
+            "conhecimentos_tecnicos": "SQL, Python, Power BI, Excel, Tableau",
+            "conhecimentos_tecnicos_extraidos": "sql, python, powerbi, excel, tableau, dados, estatistica",
+            "keywords": ["sql", "python", "powerbi", "excel", "tableau", "dados", "estatistica"],
+            "cv": "Analista de Dados com 6 anos de experiência em Business Intelligence. Expertise em SQL avançado, Python para análise de dados, Power BI, Tableau. Formação em Estatística. Experiência com data lakes, ETL e criação de dashboards executivos."
+        },
+        "31004": {
+            "nome": "Ana Beatriz Moreira",
+            "codigo": "31004",
+            "email": "ana.moreira@email.com",
+            "telefone": "(11) 96666-5555", 
+            "cidade": "São Paulo",
+            "estado": "São Paulo",
+            "pais": "Brasil",
+            "localizacao": "São Paulo São Paulo Brasil",
+            "nivel_profissional": "Júnior",
+            "nivel_academico": "Ensino Superior Completo",
+            "nivel_ingles": "Básico",
+            "nivel_espanhol": "Básico",
+            "conhecimentos_tecnicos": "Oracle, SQL, SAP BASIS, Linux",
+            "conhecimentos_tecnicos_extraidos": "oracle, sql, sap, basis, linux, dba",
+            "keywords": ["oracle", "sql", "sap", "basis", "linux", "dba"],
+            "cv": "Administradora de Banco de Dados júnior com 3 anos de experiência. Conhecimentos em Oracle, SQL, SAP BASIS, Linux. Formação em Sistemas de Informação. Experiência com backup, recovery, performance tuning e monitoramento de bases de dados."
         }
-        
-        mock_hired = {
-            "5185": ["31000"]  # Carolina foi contratada para a vaga 5185
-        }
-        
-        st.info("📊 Usando dados de demonstração. Em produção, carregue seus dados reais.")
-        
-        return {
-            'processed_jobs': mock_jobs,
-            'processed_applicants': mock_applicants,
-            'hired_candidates': mock_hired
-        }
-        
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar metadados: {e}")
-        return None
+    }
+    
+    # Dados de contratações (quem foi contratado para cada vaga)
+    hired_data = {
+        "5185": ["31001", "31004"],  # João (DevOps) e Ana (DBA) contratados para vaga Cloud
+        "5186": ["31002"],           # Maria contratada para vaga Python
+        "5187": ["31003"]            # Pedro contratado para vaga Analista de Dados
+    }
+    
+    return {
+        'processed_jobs': jobs_data,
+        'processed_applicants': applicants_data, 
+        'hired_candidates': hired_data
+    }
 
 def search_candidates_pinecone(job_id, index, top_k=7):
     """Busca candidatos similares no Pinecone"""
@@ -325,9 +426,10 @@ def search_candidates_pinecone(job_id, index, top_k=7):
         
         if not job_results.matches:
             st.error(f"❌ Vaga {job_id} não encontrada no Pinecone")
-            return []
+            return [], None
         
         job_vector = job_results.matches[0].values
+        job_metadata = job_results.matches[0].metadata
         
         # Buscar candidatos similares
         candidates_results = index.query(
@@ -338,11 +440,35 @@ def search_candidates_pinecone(job_id, index, top_k=7):
             include_values=False
         )
         
-        return candidates_results.matches[:top_k]
+        return candidates_results.matches[:top_k], job_metadata
         
     except Exception as e:
         st.error(f"❌ Erro ao buscar no Pinecone: {e}")
-        return []
+        return [], None
+
+def get_all_jobs_from_pinecone(index):
+    """Busca todas as vagas disponíveis no Pinecone"""
+    try:
+        # Buscar todas as vagas (sem vector, apenas metadados)
+        results = index.query(
+            vector=[0.0] * 512,  # Vector dummy
+            top_k=10000,
+            filter={"type": "job"},
+            include_metadata=True,
+            include_values=False
+        )
+        
+        jobs_dict = {}
+        for match in results.matches:
+            job_id = match.metadata.get('job_id')
+            if job_id:
+                jobs_dict[job_id] = match.metadata
+        
+        return jobs_dict
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao buscar vagas no Pinecone: {e}")
+        return {}
 
 def calculate_detailed_scores(job_data, candidate_metadata, similarity_score):
     """Calcula scores detalhados baseado nos metadados"""
@@ -631,22 +757,21 @@ def main():
     if not index:
         st.stop()
     
-    # Carregar metadados locais
-    metadata = load_local_metadata()
-    if not metadata:
+    # Buscar todas as vagas do Pinecone
+    st.info("🔍 Carregando vagas do Pinecone...")
+    all_jobs = get_all_jobs_from_pinecone(index)
+    
+    if not all_jobs:
+        st.error("❌ Nenhuma vaga encontrada no Pinecone")
         st.stop()
     
-    processed_jobs = metadata['processed_jobs']
-    processed_applicants = metadata['processed_applicants']
-    hired_candidates = metadata['hired_candidates']
+    st.success(f"✅ {len(all_jobs)} vagas carregadas do Pinecone!")
     
-    st.success("✅ Conectado ao Pinecone! Dados carregados com sucesso!")
-    
-    # Criar opções de vagas
+    # Criar opções de vagas baseadas nos dados do Pinecone
     job_options = {}
-    for job_id, job in processed_jobs.items():
-        title = capitalize_words(job.get('titulo', 'Sem título'))
-        company = capitalize_words(job.get('cliente', 'Empresa não especificada'))
+    for job_id, job_metadata in all_jobs.items():
+        title = capitalize_words(job_metadata.get('titulo', 'Sem título'))
+        company = capitalize_words(job_metadata.get('cliente', 'Empresa não especificada'))
         job_options[job_id] = f"{title} - {company} (ID: {job_id})"
     
     st.markdown("## Encontre os candidatos ideais em segundos")
@@ -667,13 +792,15 @@ def main():
                 st.rerun()
     
     if selected_job_id:
-        selected_job = processed_jobs[selected_job_id]
+        # Buscar dados da vaga selecionada no Pinecone
+        selected_job = all_jobs.get(selected_job_id, {})
         
+        # Renderizar detalhes da vaga (usando dados do Pinecone)
         render_job_details(selected_job)
         
         # Buscar candidatos no Pinecone
-        with st.status("🔍 Buscando candidatos mais compatíveis..."):
-            pinecone_results = search_candidates_pinecone(selected_job_id, index, top_k=7)
+        with st.status("🔍 Buscando candidatos mais compatíveis no Pinecone..."):
+            pinecone_results, job_metadata = search_candidates_pinecone(selected_job_id, index, top_k=7)
         
         if not pinecone_results:
             st.warning("⚠️ Nenhum candidato encontrado para esta vaga.")
@@ -683,17 +810,34 @@ def main():
         similarities = []
         
         for result in pinecone_results:
-            candidate_id = result.metadata.get('candidate_id')
-            candidate_name = result.metadata.get('nome', 'Nome não disponível')
+            candidate_metadata = result.metadata
+            candidate_id = candidate_metadata.get('candidate_id')
+            candidate_name = candidate_metadata.get('nome', 'Nome não disponível')
             similarity_score = result.score
             
-            # Buscar dados completos do candidato
-            applicant_data = processed_applicants.get(candidate_id, {})
+            # Usar os metadados do Pinecone como dados do candidato
+            applicant_data = {
+                'nome': candidate_name,
+                'codigo': candidate_id,
+                'email': candidate_metadata.get('email', 'N/A'),
+                'telefone': candidate_metadata.get('telefone', 'N/A'),
+                'cidade': candidate_metadata.get('cidade', 'N/A'),
+                'estado': candidate_metadata.get('estado', 'N/A'),
+                'localizacao': f"{candidate_metadata.get('cidade', '')} {candidate_metadata.get('estado', '')} Brasil",
+                'nivel_profissional': candidate_metadata.get('nivel_profissional', 'N/A'),
+                'nivel_academico': candidate_metadata.get('nivel_academico', 'N/A'),
+                'nivel_ingles': candidate_metadata.get('nivel_ingles', 'N/A'),
+                'nivel_espanhol': candidate_metadata.get('nivel_espanhol', 'N/A'),
+                'conhecimentos_tecnicos': candidate_metadata.get('keywords', 'N/A'),
+                'conhecimentos_tecnicos_extraidos': '',
+                'keywords': candidate_metadata.get('keywords', '').split(',') if candidate_metadata.get('keywords') else [],
+                'cv': f"Candidato ID: {candidate_id}. Perfil compatível com a vaga baseado em análise de similaridade semântica."
+            }
             
             # Calcular scores detalhados
             match_details = calculate_detailed_scores(
-                selected_job, 
-                result.metadata, 
+                job_metadata or selected_job, 
+                candidate_metadata, 
                 similarity_score
             )
             
@@ -708,8 +852,8 @@ def main():
                 match_details['spanish_level'] * 0.025
             )
             
-            # Verificar se foi contratado
-            is_hired = applicant_data.get('codigo', '') in hired_candidates.get(selected_job_id, [])
+            # Para demonstração, simular alguns candidatos contratados
+            is_hired = (hash(candidate_id) % 10) < 2  # ~20% dos candidatos "contratados"
             
             similarities.append({
                 'id': candidate_id,
@@ -720,15 +864,14 @@ def main():
                 'match_details': match_details
             })
         
-        # Verificar candidatos contratados
+        # Verificar candidatos contratados (simulado)
         hired_ids = [item['id'] for item in similarities if item['is_hired']]
         
         if hired_ids:
-            hit_rate = len(hired_ids) / len(hired_candidates.get(selected_job_id, []) or [1]) * 100
-            st.success(f"🎯 O sistema identificou {len(hired_ids)} dos candidatos já contratados para esta vaga! (Taxa de acerto: {hit_rate:.1f}%)")
+            st.success(f"🎯 Demonstração: {len(hired_ids)} candidatos simulados como 'já contratados' entre os 7 recomendados!")
         
-        st.markdown("## Candidatos Recomendados")
-        st.markdown("💡 **Clique em qualquer card para ver os detalhes completos do candidato**")
+        st.markdown("## Candidatos Recomendados pelo Pinecone")
+        st.markdown("💡 **Resultados baseados em busca vetorial semântica**")
         
         # Gerenciar seleção de candidato
         session_key = f"selected_candidate_{selected_job_id}"
