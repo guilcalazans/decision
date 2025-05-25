@@ -1,7 +1,7 @@
 # Requirements para Streamlit Cloud - Decision Recruiter com Pinecone
 pinecone==3.0.0
 reportlab
-
+kaleido
 tqdm==4.67.1
 altair==5.5.0
 attrs==25.3.0
