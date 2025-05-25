@@ -15,40 +15,23 @@ import streamlit_nested_layout
 import requests
 import json
 
-# Importar bibliotecas para PDF
-try:
-    from reportlab.lib.pagesizes import letter, A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
-    from reportlab.lib import colors
-    from reportlab.graphics.shapes import Drawing
-    from reportlab.graphics.charts.piecharts import Pie
-    from reportlab.graphics.charts.barcharts import VerticalBarChart
-    from reportlab.graphics.charts.axes import XCategoryAxis, YValueAxis
-    from reportlab.lib.colors import HexColor
-    import plotly.io as pio
-    import tempfile
-    PDF_AVAILABLE = True
-except ImportError:
-    PDF_AVAILABLE = False
-
 # Importar Pinecone
 try:
     from pinecone import Pinecone
     PINECONE_AVAILABLE = True
 except ImportError:
     PINECONE_AVAILABLE = False
+    st.error("❌ Pinecone não instalado. Execute: pip install pinecone-client")
 
 # Configuração da página
 st.set_page_config(
     page_title="Decision Recruiter - Recomendação de Candidatos",
-    page_icon="🎯",
+    page_icon="",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# CSS dinâmico
+# CSS dinâmico (mesmo do app.py original)
 def get_dynamic_css():
     """Retorna CSS adaptado para tema claro e escuro"""
     return """
@@ -194,6 +177,7 @@ def get_dynamic_css():
 
 # Cabeçalho personalizado
 def render_header():
+    connection_type = "GitHub + Pinecone" if st.session_state.get('pinecone_available') else "GitHub Only"
     st.markdown(f"""
     <div class="header">
         <h1 style="margin-bottom: 0.5rem;">Decision Recruiter</h1>
@@ -201,7 +185,7 @@ def render_header():
     </div>
     """, unsafe_allow_html=True)
 
-# Funções auxiliares
+# Funções auxiliares (mesmas do app.py)
 def render_skill_tag(skill):
     return f'<span class="skill-tag">{skill}</span>'
 
@@ -257,16 +241,30 @@ def merge_technical_knowledge(conhecimentos_tecnicos, conhecimentos_extraidos):
 @st.cache_resource
 def init_pinecone():
     """Inicializa conexão com Pinecone"""
-    # TEMPORARIAMENTE DESABILITADO - Limite de leituras atingido
-    return None
+    if not PINECONE_AVAILABLE:
+        return None
+        
+    try:
+        API_KEY = "pcsk_5DfEc5_JTj7W19EkqEm2awJNed9dnmdfNtKBuNv3MNzPnX9R2tJv3dRNbUEJcm9gXWNYko"
+        INDEX_NAME = "decision-recruiter"
+        pc = Pinecone(api_key=API_KEY)
+        index = pc.Index(INDEX_NAME)
+        return index
+    except Exception as e:
+        st.warning(f"⚠️ Pinecone não disponível: {e}")
+        return None
 
 @st.cache_data
 def load_data_from_github():
-    """Carrega dados do GitHub de forma rápida"""
+    """
+    OTIMIZADO: Carrega dados do GitHub de forma rápida
+    Retorna dados no formato exato que o app.py espera
+    """
     try:
         with st.status("📥 Carregando dados do GitHub..."):
             st.write("🔗 Conectando ao GitHub Releases...")
             
+            # URLs dos arquivos individuais (mais rápido que o arquivo grande)
             urls = {
                 'vagas': "https://github.com/guilcalazans/decision/releases/download/v1.0/vagas.json",
                 'candidates': "https://github.com/guilcalazans/decision/releases/download/v1.0/applicants.json", 
@@ -283,9 +281,9 @@ def load_data_from_github():
             
             st.write("✅ Dados carregados!")
         
-        # Processar dados
+        # Processar dados no formato que o app.py espera
         with st.status("🔄 Processando dados..."):
-            # 1. Processar vagas
+            # 1. Processar vagas (extrair características importantes)
             processed_jobs = {}
             for job_id, job_data in data_loaded['vagas'].items():
                 basic_info = job_data.get('informacoes_basicas', {})
@@ -310,7 +308,7 @@ def load_data_from_github():
                     'keywords': extract_keywords_from_job(job_profile)
                 }
             
-            # 2. Processar candidatos
+            # 2. Processar candidatos (extrair características importantes)
             processed_applicants = {}
             for candidate_id, candidate_data in data_loaded['candidates'].items():
                 basic_info = candidate_data.get('infos_basicas', {})
@@ -354,13 +352,14 @@ def load_data_from_github():
         else:
             st.session_state['pinecone_available'] = False
         
+        # Retornar no formato exato que o app.py espera
         return {
             'processed_jobs': processed_jobs,
             'processed_applicants': processed_applicants,
             'hired_candidates': hired_candidates,
-            'job_embeddings': {},
-            'applicant_embeddings': {},
-            'match_details': {}
+            'job_embeddings': {},  # Será populado conforme necessário
+            'applicant_embeddings': {},  # Será populado conforme necessário  
+            'match_details': {}  # Será calculado dinamicamente
         }
         
     except Exception as e:
@@ -371,6 +370,7 @@ def extract_keywords_from_job(job_profile):
     """Extrai palavras-chave técnicas da vaga"""
     keywords = []
     
+    # Texto para análise
     text_fields = [
         job_profile.get('principais_atividades', ''),
         job_profile.get('competencia_tecnicas_e_comportamentais', ''),
@@ -379,6 +379,7 @@ def extract_keywords_from_job(job_profile):
     
     combined_text = ' '.join(text_fields).lower()
     
+    # Lista de tecnologias comuns
     tech_keywords = [
         "python", "java", "javascript", "js", "c#", "c++", "php", "ruby", "go", "swift",
         "html", "css", "react", "angular", "vue", "node", "django", "flask", "spring",
@@ -402,6 +403,7 @@ def extract_keywords_from_cv(cv_text):
     keywords = []
     cv_lower = cv_text.lower()
     
+    # Lista de tecnologias comuns
     tech_keywords = [
         "python", "java", "javascript", "js", "c#", "c++", "php", "ruby", "go", "swift",
         "html", "css", "react", "angular", "vue", "node", "django", "flask", "spring",
@@ -422,6 +424,7 @@ def extract_location_from_cv(cv_text):
     if not cv_text:
         return {'cidade': '', 'estado': ''}
     
+    # Estados brasileiros
     states = {
         'sp': 'São Paulo', 'rj': 'Rio de Janeiro', 'mg': 'Minas Gerais',
         'pr': 'Paraná', 'rs': 'Rio Grande do Sul', 'sc': 'Santa Catarina'
@@ -435,36 +438,92 @@ def extract_location_from_cv(cv_text):
     
     return {'cidade': '', 'estado': ''}
 
+def search_candidates_pinecone(job_id, top_k=50):
+    """
+    OTIMIZADO: Busca rápida no Pinecone
+    Retorna apenas os melhores candidatos para processamento detalhado
+    """
+    if not st.session_state.get('pinecone_available'):
+        return []
+    
+    try:
+        index = st.session_state['pinecone_index']
+        
+        # Buscar vetor da vaga
+        job_response = index.query(
+            id=f"job_{job_id}",
+            top_k=1,
+            include_values=True
+        )
+        
+        if not job_response['matches']:
+            return []
+        
+        job_vector = job_response['matches'][0]['values']
+        
+        # Buscar candidatos similares (mais resultados para filtrar melhor)
+        candidates_response = index.query(
+            vector=job_vector,
+            top_k=top_k * 3,  # Buscar mais para filtrar depois
+            include_metadata=True
+        )
+        
+        # Filtrar apenas candidatos
+        candidates = []
+        for match in candidates_response['matches']:
+            metadata = match['metadata']
+            if (metadata.get('type') == 'candidate' or 
+                'candidate_id' in metadata or 
+                match['id'].startswith('candidate_')):
+                
+                candidate_id = metadata.get('candidate_id') or match['id'].replace('candidate_', '')
+                candidates.append({
+                    'id': candidate_id,
+                    'score': match['score'],
+                    'pinecone_similarity': match['score']
+                })
+                
+                if len(candidates) >= top_k:
+                    break
+        
+        return candidates
+        
+    except Exception as e:
+        st.warning(f"⚠️ Erro no Pinecone: {e}")
+        return []
+
 def calculate_similarity_optimized(job_id, candidate_id, processed_jobs, processed_applicants):
-    """Cálculo rápido de similaridade SEM PINECONE"""
+    """
+    OTIMIZADO: Cálculo rápido de similaridade
+    Mantém a mesma lógica do app.py mas otimizada
+    """
     job = processed_jobs[job_id]
     candidate = processed_applicants[candidate_id]
     
-    # 1. Similaridade semântica (baseada em keywords quando Pinecone não disponível)
+    # 1. Similaridade semântica (via Pinecone se disponível)
+    semantic_score = 0.5  # Valor padrão
+    
+    if st.session_state.get('pinecone_available'):
+        # Usar busca do Pinecone se disponível
+        try:
+            candidates = search_candidates_pinecone(job_id, top_k=100)
+            for c in candidates:
+                if c['id'] == candidate_id:
+                    semantic_score = c['pinecone_similarity']
+                    break
+        except:
+            semantic_score = 0.5
+    
+    # 2. Similaridade de keywords (rápida)
     job_keywords = set(job.get('keywords', []))
     candidate_keywords = set(candidate.get('keywords', []))
     
-    # Calcular similaridade textual simples
-    job_text = f"{job.get('titulo', '')} {job.get('areas_atuacao', '')} {job.get('competencias', '')}".lower()
-    candidate_text = f"{candidate.get('conhecimentos_tecnicos', '')} {candidate.get('cv', '')[:500]}".lower()
-    
-    # Contar palavras em comum
-    job_words = set(job_text.split())
-    candidate_words = set(candidate_text.split())
-    common_words = job_words.intersection(candidate_words)
-    
-    if len(job_words) > 0:
-        semantic_score = min(0.9, len(common_words) / len(job_words))
-    else:
-        semantic_score = 0.3
-    
-    # 2. Similaridade de keywords
     if job_keywords and candidate_keywords:
         keywords_score = len(job_keywords.intersection(candidate_keywords)) / len(job_keywords)
     else:
         keywords_score = 0.0
     
-    # 3. Similaridade de localização
+    # 3. Similaridade de localização (rápida)
     location_score = 0.0
     if job.get('cidade') and candidate.get('cidade'):
         if job['cidade'].lower() == candidate['cidade'].lower():
@@ -473,9 +532,9 @@ def calculate_similarity_optimized(job_id, candidate_id, processed_jobs, process
         if job['estado'].lower() == candidate['estado'].lower():
             location_score = 0.7
     else:
-        location_score = 0.3
+        location_score = 0.3  # Mesmo país
     
-    # 4. Outros scores
+    # 4. Outros scores (simplificados para velocidade)
     professional_level_score = compare_levels(
         job.get('nivel_profissional', ''),
         candidate.get('nivel_profissional', '')
@@ -496,17 +555,18 @@ def calculate_similarity_optimized(job_id, candidate_id, processed_jobs, process
         candidate.get('nivel_espanhol', '')
     )
     
-    # Score final ponderado (mais peso em keywords sem Pinecone)
+    # Score final ponderado (mesma fórmula do app.py)
     final_score = (
-        semantic_score * 0.30 +
-        keywords_score * 0.50 +
+        semantic_score * 0.40 +
+        keywords_score * 0.30 +
         location_score * 0.05 +
-        professional_level_score * 0.075 +
-        academic_level_score * 0.075 +
-        english_score * 0.0 +
-        spanish_score * 0.0
+        professional_level_score * 0.10 +
+        academic_level_score * 0.10 +
+        english_score * 0.025 +
+        spanish_score * 0.025
     )
     
+    # Retornar detalhes completos
     details = {
         'semantic': semantic_score,
         'keywords': keywords_score,
@@ -527,13 +587,16 @@ def compare_levels(required_level, candidate_level):
     if not required_level or not candidate_level:
         return 0.5
     
+    # Normalizar
     required = required_level.lower()
     candidate = candidate_level.lower()
     
+    # Hierarquias simplificadas
     prof_levels = {'junior': 1, 'pleno': 2, 'senior': 3, 'sênior': 3}
     acad_levels = {'médio': 1, 'técnico': 2, 'superior': 3, 'mestrado': 4, 'doutorado': 5}
     lang_levels = {'básico': 1, 'intermediário': 2, 'avançado': 3, 'fluente': 4}
     
+    # Determinar qual hierarquia usar
     for levels_dict in [prof_levels, acad_levels, lang_levels]:
         req_score = 0
         cand_score = 0
@@ -547,40 +610,36 @@ def compare_levels(required_level, candidate_level):
         if req_score > 0 and cand_score > 0:
             return min(1.0, cand_score / req_score)
     
+    # Se não encontrou em nenhuma hierarquia, comparação simples
     return 1.0 if required in candidate or candidate in required else 0.5
 
 def get_top_candidates_fast(job_id, processed_jobs, processed_applicants, top_k=7):
-    """Busca rápida dos melhores candidatos SEM PINECONE"""
-    all_candidates = list(processed_applicants.keys())
-    
-    job = processed_jobs[job_id]
-    job_keywords = set(job.get('keywords', []))
-    
+    """
+    OTIMIZADO: Busca rápida dos melhores candidatos
+    Combina Pinecone (se disponível) + filtros rápidos
+    """
     candidates_to_evaluate = []
     
-    if job_keywords:
-        for candidate_id in all_candidates:
-            candidate = processed_applicants[candidate_id]
-            candidate_keywords = set(candidate.get('keywords', []))
-            
-            if job_keywords.intersection(candidate_keywords):
-                candidates_to_evaluate.append(candidate_id)
-        
-        if len(candidates_to_evaluate) < 50:
-            remaining = [c for c in all_candidates if c not in candidates_to_evaluate]
-            candidates_to_evaluate.extend(remaining[:200-len(candidates_to_evaluate)])
-    else:
-        candidates_to_evaluate = all_candidates[:500]
+    # 1. Se Pinecone disponível, buscar candidatos pré-filtrados
+    if st.session_state.get('pinecone_available'):
+        pinecone_candidates = search_candidates_pinecone(job_id, top_k=50)
+        candidates_to_evaluate = [c['id'] for c in pinecone_candidates]
     
+    # 2. Se Pinecone não disponível ou retornou poucos resultados, usar todos
+    if len(candidates_to_evaluate) < 20:
+        candidates_to_evaluate = list(processed_applicants.keys())
+    
+    # 3. Calcular similaridade apenas para candidatos selecionados
     results = []
     
     progress_bar = st.progress(0)
     status_text = st.empty()
     
     for i, candidate_id in enumerate(candidates_to_evaluate):
+        # Atualizar progresso
         progress = int((i + 1) / len(candidates_to_evaluate) * 100)
         progress_bar.progress(progress)
-        status_text.text(f"🔄 Analisando candidato {i+1}/{len(candidates_to_evaluate)} (sem Pinecone)")
+        status_text.text(f"🔄 Analisando candidato {i+1}/{len(candidates_to_evaluate)}")
         
         similarity_data = calculate_similarity_optimized(
             job_id, candidate_id, processed_jobs, processed_applicants
@@ -592,17 +651,20 @@ def get_top_candidates_fast(job_id, processed_jobs, processed_applicants, top_k=
             'id': candidate_id,
             'nome': candidate['nome'],
             'score': similarity_data['score'],
-            'is_hired': False,
+            'is_hired': False,  # Será atualizado depois
             'applicant_data': candidate,
             'match_details': similarity_data['details']
         })
     
+    # Limpar barras de progresso
     progress_bar.empty()
     status_text.empty()
     
+    # Ordenar por score e retornar top candidatos
     results.sort(key=lambda x: x['score'], reverse=True)
-    return results[:top_k * 2]
+    return results[:top_k * 2]  # Retornar mais que o necessário para ter opções
 
+# Funções de renderização (EXATAMENTE IGUAIS ao app.py)
 def get_theme_colors():
     return {
         'primary': '#4F46E5',
@@ -615,7 +677,7 @@ def get_theme_colors():
     }
 
 def render_radar_chart(match_details):
-    """Renderiza o gráfico de radar"""
+    """Renderiza o gráfico de radar (mesmo do app.py)"""
     categories = [
         'Semântica', 'Palavras-chave', 'Localização', 
         'Nível Prof.', 'Nível Acad.', 
@@ -675,278 +737,6 @@ def render_radar_chart(match_details):
     
     return fig
 
-def create_radar_chart_for_pdf(top_candidates):
-    """Cria gráfico de radar usando ReportLab para PDF"""
-    try:
-        drawing = Drawing(400, 300)
-        
-        categories = ['Semântica', 'Keywords', 'Localização', 'Nível Prof.', 'Nível Acad.']
-        colors_list = [HexColor('#4F46E5'), HexColor('#10B981'), HexColor('#F59E0B')]
-        
-        chart = VerticalBarChart()
-        chart.x = 50
-        chart.y = 50
-        chart.height = 200
-        chart.width = 300
-        
-        data = []
-        for i, candidate in enumerate(top_candidates[:3]):
-            match_details = candidate['match_details']
-            values = [
-                match_details.get('semantic', 0) * 100,
-                match_details.get('keywords', 0) * 100,
-                match_details.get('location', 0) * 100,
-                match_details.get('professional_level', 0) * 100,
-                match_details.get('academic_level', 0) * 100
-            ]
-            data.append(values)
-        
-        chart.data = data
-        chart.categoryAxis.categoryNames = categories
-        chart.valueAxis.valueMin = 0
-        chart.valueAxis.valueMax = 100
-        
-        for i in range(min(3, len(top_candidates))):
-            chart.bars[i].fillColor = colors_list[i]
-        
-        chart.categoryAxis.labels.fontSize = 8
-        chart.valueAxis.labels.fontSize = 8
-        
-        drawing.add(chart)
-        
-        legend_y = 260
-        for i, candidate in enumerate(top_candidates[:3]):
-            if i < len(colors_list):
-                from reportlab.graphics.shapes import Rect, String
-                rect = Rect(50 + i * 100, legend_y, 10, 10)
-                rect.fillColor = colors_list[i]
-                rect.strokeColor = colors_list[i]
-                drawing.add(rect)
-                
-                text = String(65 + i * 100, legend_y + 2, f"{i+1}º - {candidate['nome'][:10]}...")
-                text.fontSize = 8
-                drawing.add(text)
-        
-        return drawing
-        
-    except Exception as e:
-        print(f"Erro ao criar gráfico de radar: {e}")
-        return None
-
-def create_bar_chart_for_pdf(top_candidates):
-    """Cria gráfico de barras usando ReportLab para PDF"""
-    try:
-        drawing = Drawing(400, 250)
-        
-        chart = VerticalBarChart()
-        chart.x = 50
-        chart.y = 50
-        chart.height = 150
-        chart.width = 300
-        
-        data = []
-        names = []
-        
-        for i, candidate in enumerate(top_candidates[:5]):
-            data.append(candidate['score'] * 100)
-            names.append(f"{i+1}º")
-        
-        chart.data = [data]
-        chart.categoryAxis.categoryNames = names
-        chart.valueAxis.valueMin = 0
-        chart.valueAxis.valueMax = 100
-        
-        chart.bars[0].fillColor = HexColor('#4F46E5')
-        
-        chart.categoryAxis.labels.fontSize = 10
-        chart.valueAxis.labels.fontSize = 8
-        chart.valueAxis.labelTextFormat = '%d%%'
-        
-        drawing.add(chart)
-        
-        from reportlab.graphics.shapes import String
-        title = String(200, 220, 'Scores dos Top 5 Candidatos')
-        title.fontSize = 12
-        title.textAnchor = 'middle'
-        drawing.add(title)
-        
-        return drawing
-        
-    except Exception as e:
-        print(f"Erro ao criar gráfico de barras: {e}")
-        return None
-
-def create_pdf_report(similarities, selected_job, top_n=5):
-    """Cria um relatório em PDF com resumo executivo, gráficos e tabela"""
-    if not PDF_AVAILABLE:
-        return None
-    
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            spaceAfter=30,
-            textColor=colors.HexColor('#4F46E5')
-        )
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            spaceAfter=12,
-            textColor=colors.HexColor('#1F2937')
-        )
-        
-        story = []
-        top_candidates = similarities[:top_n]
-        
-        # Título do relatório
-        story.append(Paragraph("RELATÓRIO DE CANDIDATOS RECOMENDADOS", title_style))
-        story.append(Spacer(1, 20))
-        
-        # Informações da vaga
-        story.append(Paragraph("Informações da Vaga", heading_style))
-        vaga_info = f"""
-        <b>Título:</b> {capitalize_words(selected_job.get('titulo', 'N/A'))}<br/>
-        <b>Cliente:</b> {capitalize_words(selected_job.get('cliente', 'N/A'))}<br/>
-        <b>Empresa:</b> {capitalize_words(selected_job.get('empresa', 'N/A'))}<br/>
-        <b>Localização:</b> {capitalize_words(clean_duplicated_words(selected_job.get('localizacao', 'N/A')))}<br/>
-        <b>Nível Profissional:</b> {capitalize_words(selected_job.get('nivel_profissional', 'N/A'))}<br/>
-        <b>Nível Acadêmico:</b> {capitalize_words(selected_job.get('nivel_academico', 'N/A'))}
-        """
-        story.append(Paragraph(vaga_info, styles['Normal']))
-        story.append(Spacer(1, 20))
-        
-        # Resumo Executivo
-        best_candidate = top_candidates[0] if top_candidates else None
-        avg_score = sum(c['score'] for c in top_candidates) / len(top_candidates) if top_candidates else 0
-        hired_count = sum(1 for c in top_candidates if c['is_hired'])
-        best_technical = max(top_candidates, key=lambda x: x['match_details'].get('keywords', 0)) if top_candidates else None
-        
-        story.append(Paragraph("Resumo Executivo", heading_style))
-        resumo_info = f"""
-        <b>Melhor candidato:</b> {best_candidate['nome'] if best_candidate else 'N/A'} 
-        ({best_candidate['score'] * 100:.1f}% de compatibilidade)<br/>
-        <b>Score médio:</b> {avg_score * 100:.1f}%<br/>
-        <b>Candidatos já contratados:</b> {hired_count} de {len(top_candidates)}<br/>
-        <b>Melhor match técnico:</b> {best_technical['nome'] if best_technical else 'N/A'} 
-        ({best_technical['match_details'].get('keywords', 0) * 100:.0f}%)<br/>
-        <b>Recomendação:</b> {"Excelente pool de candidatos com forte alinhamento técnico." if avg_score > 0.7 else "Pool de candidatos com potencial, recomenda-se análise detalhada dos perfis."}
-        """
-        story.append(Paragraph(resumo_info, styles['Normal']))
-        story.append(Spacer(1, 30))
-        
-        # GRÁFICOS
-        story.append(Paragraph("Análise Visual dos Candidatos", heading_style))
-        
-        # Gráfico de Barras
-        bar_chart = create_bar_chart_for_pdf(top_candidates)
-        if bar_chart:
-            story.append(bar_chart)
-            story.append(Spacer(1, 20))
-        
-        # Gráfico de Radar
-        radar_chart = create_radar_chart_for_pdf(top_candidates)
-        if radar_chart:
-            story.append(Paragraph("Comparação Multidimensional (Top 3)", ParagraphStyle(
-                'ChartTitle', parent=styles['Normal'], fontSize=12, spaceAfter=10
-            )))
-            story.append(radar_chart)
-            story.append(Spacer(1, 30))
-        
-        # Tabela de candidatos
-        story.append(Paragraph("Top 5 Candidatos Recomendados", heading_style))
-        
-        table_data = [['Pos.', 'Nome', 'Score Total', 'Score Semântico', 'Score Keywords', 'Nível Prof.', 'Localização']]
-        
-        for i, candidate in enumerate(top_candidates):
-            applicant_data = candidate['applicant_data']
-            match_details = candidate['match_details']
-            
-            row = [
-                f"{i+1}º",
-                candidate['nome'][:25] + ('...' if len(candidate['nome']) > 25 else ''),
-                f"{candidate['score'] * 100:.1f}%",
-                f"{match_details.get('semantic', 0) * 100:.1f}%",
-                f"{match_details.get('keywords', 0) * 100:.1f}%",
-                capitalize_words(applicant_data.get('nivel_profissional', 'N/A'))[:15],
-                capitalize_words(clean_duplicated_words(applicant_data.get('localizacao', 'N/A')))[:20]
-            ]
-            table_data.append(row)
-        
-        table = Table(table_data, colWidths=[0.8*inch, 2*inch, 1*inch, 1*inch, 1*inch, 1.2*inch, 1.5*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        
-        story.append(table)
-        story.append(Spacer(1, 30))
-        
-        # Informações de contato
-        story.append(PageBreak())
-        story.append(Paragraph("Informações de Contato dos Candidatos", heading_style))
-        
-        for i, candidate in enumerate(top_candidates):
-            applicant_data = candidate['applicant_data']
-            match_details = candidate['match_details']
-            
-            conhecimentos_unificados = merge_technical_knowledge(
-                applicant_data.get('conhecimentos_tecnicos', ''),
-                applicant_data.get('conhecimentos_tecnicos_extraidos', '')
-            )
-            
-            job_keywords = set(selected_job.get('keywords', []))
-            candidate_keywords = set(applicant_data.get('keywords', []))
-            matching_keywords = job_keywords.intersection(candidate_keywords)
-            
-            candidate_info = f"""
-            <b>{i+1}º - {candidate['nome']}</b> (Score: {candidate['score'] * 100:.1f}%)<br/>
-            <b>Email:</b> {applicant_data.get('email', 'N/A')}<br/>
-            <b>Telefone:</b> {applicant_data.get('telefone', 'N/A')}<br/>
-            <b>Localização:</b> {capitalize_words(clean_duplicated_words(applicant_data.get('localizacao', 'N/A')))}<br/>
-            <b>Nível Profissional:</b> {capitalize_words(applicant_data.get('nivel_profissional', 'N/A'))}<br/>
-            <b>Nível Acadêmico:</b> {capitalize_words(applicant_data.get('nivel_academico', 'N/A'))}<br/>
-            <b>Conhecimentos Técnicos:</b> {conhecimentos_unificados[:100]}{'...' if len(conhecimentos_unificados) > 100 else ''}<br/>
-            <b>Keywords Compatíveis:</b> {', '.join(list(matching_keywords)[:5]) if matching_keywords else 'Nenhuma'}<br/>
-            <b>ID Candidato:</b> {candidate['id']}
-            """
-            story.append(Paragraph(candidate_info, styles['Normal']))
-            story.append(Spacer(1, 15))
-        
-        # Nota sobre gráficos
-        story.append(PageBreak())
-        story.append(Paragraph("Sobre os Gráficos", heading_style))
-        graficos_info = """
-        <b>Gráfico de Barras:</b> Mostra o score total de compatibilidade de cada candidato.<br/><br/>
-        <b>Gráfico Multidimensional:</b> Compara os top 3 candidatos em diferentes critérios:
-        <br/>• Semântica: Similaridade geral do perfil
-        <br/>• Keywords: Match de habilidades técnicas
-        <br/>• Localização: Compatibilidade geográfica
-        <br/>• Nível Prof.: Adequação da experiência
-        <br/>• Nível Acad.: Compatibilidade da formação
-        """
-        story.append(Paragraph(graficos_info, styles['Normal']))
-        
-        doc.build(story)
-        buffer.seek(0)
-        return buffer.getvalue()
-        
-    except Exception as e:
-        st.error(f"Erro ao gerar PDF: {e}")
-        return None
-
 def create_cv_download_link(cv_text, candidate_name, candidate_id):
     """Cria um link de download para o currículo do candidato"""
     if not cv_text or cv_text.strip() == "":
@@ -962,7 +752,7 @@ def create_cv_download_link(cv_text, candidate_name, candidate_id):
     return cv_bytes, filename
 
 def render_candidate_details(candidate, selected_job):
-    """Renderiza os detalhes do candidato selecionado"""
+    """Renderiza os detalhes do candidato selecionado (mesmo do app.py)"""
     applicant_data = candidate['applicant_data']
     match_details = candidate['match_details']
     
@@ -1123,17 +913,17 @@ def render_candidate_details(candidate, selected_job):
         with st.container(border=True):
             st.markdown("""
             O score total é calculado como uma média ponderada dos seguintes componentes:
-            - **🧠 Semântica (30%)**: Similaridade geral entre o perfil do candidato e a vaga.
-            - **💻 Palavras-chave técnicas (50%)**: Match entre as habilidades técnicas requeridas e as do candidato.
-            - **📍 Localização (5%)**: Compatibilidade geográfica.
-            - **💼 Nível Profissional (7.5%)**: Adequação do nível de experiência.
-            - **🎓 Nível Acadêmico (7.5%)**: Adequação da formação acadêmica.
-            
-            *Nota: Pesos ajustados para otimização sem Pinecone*
+            - **🧠 Semântica (40%)**: Similaridade geral entre o perfil do candidato e a vaga.
+            - **💻 Palavras-chave técnicas (30%)**: Match entre as habilidades técnicas requeridas e as do candidato.
+            - **📍 Localização (5%)**: Compatibilidade geográfica (peso reduzido para vagas remotas/híbridas).
+            - **💼 Nível Profissional (10%)**: Adequação do nível de experiência.
+            - **🎓 Nível Acadêmico (10%)**: Adequação da formação acadêmica.
+            - **🇺🇸 Inglês (2.5%)**: Compatibilidade do nível de inglês.
+            - **🇪🇸 Espanhol (2.5%)**: Compatibilidade do nível de espanhol.
             """)
 
 def render_job_details(job):
-    """Renderiza os detalhes da vaga selecionada"""
+    """Renderiza os detalhes da vaga selecionada (mesmo do app.py)"""
     with st.expander("Detalhes da Vaga", expanded=False):
         col1, col2 = st.columns(2)
         
@@ -1174,7 +964,7 @@ def render_job_details(job):
                 st.markdown(job.get('competencias', 'N/A'))
 
 def render_comparison_view(similarities, selected_job, top_n=5):
-    """Renderiza visualização de comparação"""
+    """Renderiza visualização de comparação (mesmo do app.py)"""
     
     top_candidates = similarities[:top_n]
     
@@ -1415,11 +1205,33 @@ def render_comparison_view(similarities, selected_job, top_n=5):
         col1, col2 = st.columns(2)
         
         with col1:
-            # Download Excel
+            csv_buffer = io.StringIO()
+            
+            csv_buffer.write("RELATÓRIO DE CANDIDATOS RECOMENDADOS\n")
+            csv_buffer.write(f"Vaga;{capitalize_words(selected_job.get('titulo', 'N/A'))}\n")
+            csv_buffer.write(f"Cliente;{capitalize_words(selected_job.get('cliente', 'N/A'))}\n")
+            csv_buffer.write(f"Data do Relatório;{pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}\n")
+            csv_buffer.write(f"Melhor Candidato;{best_candidate['nome'] if best_candidate else 'N/A'}\n")
+            csv_buffer.write(f"Score Médio;{avg_score * 100:.1f}%\n")
+            csv_buffer.write("\n")
+            csv_buffer.write("CANDIDATOS RECOMENDADOS\n")
+            
+            df_detailed.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8')
+            
+            csv_content = csv_buffer.getvalue()
+            csv_buffer.close()
+            
+            st.download_button(
+                label="📥 Baixar Relatório (CSV)",
+                data=csv_content.encode('utf-8'),
+                file_name=f"relatorio_candidatos_otimizado_{timestamp}.csv",
+                mime="text/csv"
+            )
+        
+        with col2:
             try:
                 excel_buffer = io.BytesIO()
                 with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                    # Resumo executivo
                     resumo_data = [
                         ['RELATÓRIO DE CANDIDATOS RECOMENDADOS', ''],
                         ['Vaga', capitalize_words(selected_job.get('titulo', 'N/A'))],
@@ -1438,7 +1250,9 @@ def render_comparison_view(similarities, selected_job, top_n=5):
                     ]
                     
                     resumo_df = pd.DataFrame(resumo_data, columns=['Campo', 'Valor'])
+                    
                     resumo_df.to_excel(writer, sheet_name='Relatório Completo', index=False, startrow=0)
+                    
                     df_detailed.to_excel(writer, sheet_name='Relatório Completo', index=False, startrow=len(resumo_data) + 2)
                 
                 excel_content = excel_buffer.getvalue()
@@ -1449,46 +1263,14 @@ def render_comparison_view(similarities, selected_job, top_n=5):
                     data=excel_content,
                     file_name=f"relatorio_candidatos_{timestamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    help="Baixar relatório completo em Excel"
+                    help="Baixar relatório completo em Excel - tudo em uma única aba"
                 )
-            except Exception as e:
+            except:
                 st.button(
                     "📊 Excel (Indisponível)",
                     disabled=True,
-                    help=f"Excel não disponível: {e}"
+                    help="Excel não disponível - instale openpyxl se necessário"
                 )
-        
-        with col2:
-            # Download PDF
-            if PDF_AVAILABLE:
-                pdf_content = create_pdf_report(similarities, selected_job)
-                if pdf_content:
-                    st.download_button(
-                        label="📄 Baixar Relatório (PDF)",
-                        data=pdf_content,
-                        file_name=f"relatorio_candidatos_{timestamp}.pdf",
-                        mime="application/pdf",
-                        help="Baixar relatório completo em PDF com gráficos"
-                    )
-                else:
-                    st.button(
-                        "📄 PDF (Erro na geração)",
-                        disabled=True,
-                        help="Erro ao gerar PDF"
-                    )
-            else:
-                st.button(
-                    "📄 PDF (Indisponível)",
-                    disabled=True,
-                    help="PDF não disponível - instale reportlab: pip install reportlab"
-                )
-        
-        st.info("""
-        💡 **Sobre os Relatórios:**
-        - **Excel**: Contém resumo executivo e dados completos dos candidatos
-        - **PDF**: Inclui resumo executivo, gráficos do top 5 e tabela comparativa
-        - Ideal para compartilhar com equipes de RH e gestores
-        """)
 
 def main():
     """Função principal otimizada"""
@@ -1511,7 +1293,10 @@ def main():
     st.success("✅ Dados carregados com sucesso!")
     
     # Informar sobre conexões
-    st.info("📊 **Modo Padrão:** Dados completos do GitHub (Pinecone temporariamente desabilitado - limite mensal atingido)")
+    if st.session_state.get('pinecone_available'):
+        st.info("🎯 **Modo Otimizado:** Busca vetorial via Pinecone + dados completos do GitHub")
+    else:
+        st.info("📊 **Modo Padrão:** Dados completos do GitHub (Pinecone indisponível)")
     
     # Selectbox de vagas
     job_options = {}
@@ -1694,3 +1479,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+        
