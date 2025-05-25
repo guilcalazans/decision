@@ -18,14 +18,17 @@ import json
 # Importar bibliotecas para PDF
 try:
     from reportlab.lib.pagesizes import letter, A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.lib import colors
     from reportlab.graphics.shapes import Drawing
     from reportlab.graphics.charts.piecharts import Pie
     from reportlab.graphics.charts.barcharts import VerticalBarChart
+    from reportlab.graphics.charts.axes import XCategoryAxis, YValueAxis
     from reportlab.lib.colors import HexColor
+    import plotly.io as pio
+    import tempfile
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
@@ -254,6 +257,9 @@ def merge_technical_knowledge(conhecimentos_tecnicos, conhecimentos_extraidos):
 @st.cache_resource
 def init_pinecone():
     """Inicializa conexão com Pinecone"""
+    # TEMPORARIAMENTE DESABILITADO - Limite de leituras atingido
+    return None
+    
     if not PINECONE_AVAILABLE:
         return None
         
@@ -507,36 +513,37 @@ def search_candidates_pinecone(job_id, top_k=50):
 
 def calculate_similarity_optimized(job_id, candidate_id, processed_jobs, processed_applicants):
     """
-    OTIMIZADO: Cálculo rápido de similaridade
-    Mantém a mesma lógica do app.py mas otimizada
+    OTIMIZADO: Cálculo rápido de similaridade SEM PINECONE
+    Usa similaridade baseada em keywords e metadados
     """
     job = processed_jobs[job_id]
     candidate = processed_applicants[candidate_id]
     
-    # 1. Similaridade semântica (via Pinecone se disponível)
-    semantic_score = 0.5  # Valor padrão
-    
-    if st.session_state.get('pinecone_available'):
-        # Usar busca do Pinecone se disponível
-        try:
-            candidates = search_candidates_pinecone(job_id, top_k=100)
-            for c in candidates:
-                if c['id'] == candidate_id:
-                    semantic_score = c['pinecone_similarity']
-                    break
-        except:
-            semantic_score = 0.5
-    
-    # 2. Similaridade de keywords (rápida)
+    # 1. Similaridade semântica (baseada em keywords quando Pinecone não disponível)
     job_keywords = set(job.get('keywords', []))
     candidate_keywords = set(candidate.get('keywords', []))
     
+    # Calcular similaridade textual simples
+    job_text = f"{job.get('titulo', '')} {job.get('areas_atuacao', '')} {job.get('competencias', '')}".lower()
+    candidate_text = f"{candidate.get('conhecimentos_tecnicos', '')} {candidate.get('cv', '')[:500]}".lower()
+    
+    # Contar palavras em comum (aproximação da similaridade semântica)
+    job_words = set(job_text.split())
+    candidate_words = set(candidate_text.split())
+    common_words = job_words.intersection(candidate_words)
+    
+    if len(job_words) > 0:
+        semantic_score = min(0.9, len(common_words) / len(job_words))
+    else:
+        semantic_score = 0.3
+    
+    # 2. Similaridade de keywords (mais peso quando sem Pinecone)
     if job_keywords and candidate_keywords:
         keywords_score = len(job_keywords.intersection(candidate_keywords)) / len(job_keywords)
     else:
         keywords_score = 0.0
     
-    # 3. Similaridade de localização (rápida)
+    # 3. Similaridade de localização
     location_score = 0.0
     if job.get('cidade') and candidate.get('cidade'):
         if job['cidade'].lower() == candidate['cidade'].lower():
@@ -547,7 +554,7 @@ def calculate_similarity_optimized(job_id, candidate_id, processed_jobs, process
     else:
         location_score = 0.3  # Mesmo país
     
-    # 4. Outros scores (simplificados para velocidade)
+    # 4. Outros scores
     professional_level_score = compare_levels(
         job.get('nivel_profissional', ''),
         candidate.get('nivel_profissional', '')
@@ -568,15 +575,15 @@ def calculate_similarity_optimized(job_id, candidate_id, processed_jobs, process
         candidate.get('nivel_espanhol', '')
     )
     
-    # Score final ponderado (mesma fórmula do app.py)
+    # Score final ponderado (mais peso em keywords sem Pinecone)
     final_score = (
-        semantic_score * 0.40 +
-        keywords_score * 0.30 +
+        semantic_score * 0.30 +      # Reduzido sem Pinecone
+        keywords_score * 0.50 +      # Aumentado para compensar
         location_score * 0.05 +
-        professional_level_score * 0.10 +
-        academic_level_score * 0.10 +
-        english_score * 0.025 +
-        spanish_score * 0.025
+        professional_level_score * 0.075 +
+        academic_level_score * 0.075 +
+        english_score * 0.0 +        # Removido temporariamente
+        spanish_score * 0.0          # Removido temporariamente
     )
     
     # Retornar detalhes completos
@@ -628,21 +635,38 @@ def compare_levels(required_level, candidate_level):
 
 def get_top_candidates_fast(job_id, processed_jobs, processed_applicants, top_k=7):
     """
-    OTIMIZADO: Busca rápida dos melhores candidatos
-    Combina Pinecone (se disponível) + filtros rápidos
+    OTIMIZADO: Busca rápida dos melhores candidatos SEM PINECONE
+    Usa filtros baseados em keywords e compatibilidade
     """
+    # Sem Pinecone, processar todos os candidatos mas com filtros inteligentes
+    all_candidates = list(processed_applicants.keys())
+    
+    # Pré-filtro baseado em keywords da vaga para reduzir processamento
+    job = processed_jobs[job_id]
+    job_keywords = set(job.get('keywords', []))
+    
     candidates_to_evaluate = []
     
-    # 1. Se Pinecone disponível, buscar candidatos pré-filtrados
-    if st.session_state.get('pinecone_available'):
-        pinecone_candidates = search_candidates_pinecone(job_id, top_k=50)
-        candidates_to_evaluate = [c['id'] for c in pinecone_candidates]
+    # Se há keywords na vaga, priorizar candidatos que tenham pelo menos uma
+    if job_keywords:
+        for candidate_id in all_candidates:
+            candidate = processed_applicants[candidate_id]
+            candidate_keywords = set(candidate.get('keywords', []))
+            
+            # Se tem pelo menos 1 keyword em comum, incluir
+            if job_keywords.intersection(candidate_keywords):
+                candidates_to_evaluate.append(candidate_id)
+        
+        # Se filtro foi muito restritivo, adicionar mais candidatos
+        if len(candidates_to_evaluate) < 50:
+            # Adicionar candidatos restantes até 200 total
+            remaining = [c for c in all_candidates if c not in candidates_to_evaluate]
+            candidates_to_evaluate.extend(remaining[:200-len(candidates_to_evaluate)])
+    else:
+        # Se não há keywords, pegar uma amostra representativa
+        candidates_to_evaluate = all_candidates[:500]  # Limitar para performance
     
-    # 2. Se Pinecone não disponível ou retornou poucos resultados, usar todos
-    if len(candidates_to_evaluate) < 20:
-        candidates_to_evaluate = list(processed_applicants.keys())
-    
-    # 3. Calcular similaridade apenas para candidatos selecionados
+    # Calcular similaridade para candidatos selecionados
     results = []
     
     progress_bar = st.progress(0)
@@ -652,7 +676,7 @@ def get_top_candidates_fast(job_id, processed_jobs, processed_applicants, top_k=
         # Atualizar progresso
         progress = int((i + 1) / len(candidates_to_evaluate) * 100)
         progress_bar.progress(progress)
-        status_text.text(f"🔄 Analisando candidato {i+1}/{len(candidates_to_evaluate)}")
+        status_text.text(f"🔄 Analisando candidato {i+1}/{len(candidates_to_evaluate)} (sem Pinecone)")
         
         similarity_data = calculate_similarity_optimized(
             job_id, candidate_id, processed_jobs, processed_applicants
@@ -750,7 +774,130 @@ def render_radar_chart(match_details):
     
     return fig
 
-def create_cv_download_link(cv_text, candidate_name, candidate_id):
+def create_radar_chart_for_pdf(top_candidates):
+    """Cria gráfico de radar usando ReportLab para PDF"""
+    try:
+        # Criar drawing
+        drawing = Drawing(400, 300)
+        
+        # Dados para o gráfico (apenas top 3 para melhor visualização)
+        categories = ['Semântica', 'Keywords', 'Localização', 'Nível Prof.', 'Nível Acad.']
+        colors_list = [HexColor('#4F46E5'), HexColor('#10B981'), HexColor('#F59E0B')]
+        
+        # Como ReportLab não tem radar nativo, vamos criar um gráfico de barras horizontal
+        chart = VerticalBarChart()
+        chart.x = 50
+        chart.y = 50
+        chart.height = 200
+        chart.width = 300
+        
+        # Preparar dados
+        data = []
+        for i, candidate in enumerate(top_candidates[:3]):
+            match_details = candidate['match_details']
+            values = [
+                match_details.get('semantic', 0) * 100,
+                match_details.get('keywords', 0) * 100,
+                match_details.get('location', 0) * 100,
+                match_details.get('professional_level', 0) * 100,
+                match_details.get('academic_level', 0) * 100
+            ]
+            data.append(values)
+        
+        chart.data = data
+        chart.categoryAxis.categoryNames = categories
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 100
+        
+        # Cores das barras
+        for i in range(min(3, len(top_candidates))):
+            chart.bars[i].fillColor = colors_list[i]
+        
+        # Labels
+        chart.categoryAxis.labels.fontSize = 8
+        chart.valueAxis.labels.fontSize = 8
+        
+        drawing.add(chart)
+        
+        # Adicionar legenda
+        legend_y = 260
+        for i, candidate in enumerate(top_candidates[:3]):
+            if i < len(colors_list):
+                # Quadrado colorido
+                from reportlab.graphics.shapes import Rect, String
+                rect = Rect(50 + i * 100, legend_y, 10, 10)
+                rect.fillColor = colors_list[i]
+                rect.strokeColor = colors_list[i]
+                drawing.add(rect)
+                
+                # Texto da legenda
+                text = String(65 + i * 100, legend_y + 2, f"{i+1}º - {candidate['nome'][:10]}...")
+                text.fontSize = 8
+                drawing.add(text)
+        
+        return drawing
+        
+    except Exception as e:
+        print(f"Erro ao criar gráfico de radar: {e}")
+        return None
+
+def create_bar_chart_for_pdf(top_candidates):
+    """Cria gráfico de barras usando ReportLab para PDF"""
+    try:
+        drawing = Drawing(400, 250)
+        
+        chart = VerticalBarChart()
+        chart.x = 50
+        chart.y = 50
+        chart.height = 150
+        chart.width = 300
+        
+        # Preparar dados - scores totais
+        data = []
+        names = []
+        
+        for i, candidate in enumerate(top_candidates[:5]):
+            data.append(candidate['score'] * 100)
+            names.append(f"{i+1}º")
+        
+        chart.data = [data]  # Lista de listas
+        chart.categoryAxis.categoryNames = names
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 100
+        
+        # Cor das barras
+        chart.bars[0].fillColor = HexColor('#4F46E5')
+        
+        # Labels
+        chart.categoryAxis.labels.fontSize = 10
+        chart.valueAxis.labels.fontSize = 8
+        chart.valueAxis.labelTextFormat = '%d%%'
+        
+        drawing.add(chart)
+        
+        # Título
+        from reportlab.graphics.shapes import String
+        title = String(200, 220, 'Scores dos Top 5 Candidatos')
+        title.fontSize = 12
+        title.textAnchor = 'middle'
+        drawing.add(title)
+        
+        return drawing
+        
+    except Exception as e:
+        print(f"Erro ao criar gráfico de barras: {e}")
+        return None
+
+def save_plotly_chart_as_image(fig, width=600, height=400):
+    """Salva gráfico Plotly como imagem temporária para PDF"""
+    try:
+        # Salvar como imagem temporária
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        pio.write_image(fig, temp_file.name, format='png', width=width, height=height)
+        return temp_file.name
+    except Exception as e:
+        print(f"Erro ao salvar gráfico Plotly: {e}")
+        return None
     """Cria um link de download para o currículo do candidato"""
     if not cv_text or cv_text.strip() == "":
         return None
@@ -1456,11 +1603,8 @@ def main():
     
     st.success("✅ Dados carregados com sucesso!")
     
-    # Informar sobre conexões (removido GitHub Only)
-    if st.session_state.get('pinecone_available'):
-        st.info("🎯 **Modo Otimizado:** Busca vetorial via Pinecone + dados completos do GitHub")
-    else:
-        st.info("📊 **Modo Padrão:** Dados completos do GitHub")
+    # Informar sobre conexões
+    st.info("📊 **Modo Padrão:** Dados completos do GitHub (Pinecone temporariamente desabilitado - limite mensal atingido)")
     
     # Selectbox de vagas
     job_options = {}
