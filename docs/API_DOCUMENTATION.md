@@ -2,6 +2,22 @@
 
 Esta documentação descreve a arquitetura interna, funções principais e fluxos de dados do sistema Decision Recruiter.
 
+> 📋 **Nota**: Esta documentação cobre a **versão original** do sistema. Para a **versão otimizada** com GitHub Releases + Pinecone, consulte: **[📚 API da Versão Otimizada](API_DOCUMENTATION_OPTIMIZED.md)**
+
+## Por que há duas versões?
+
+### **Versão Original** (Documentada aqui)
+- **Arquivo único** de 500MB com embeddings pré-processados (Google Drive)
+- **Processamento offline completo** - máxima precisão
+- **Ideal para**: Ambientes com recursos abundantes e análises profundas
+
+### **Versão Otimizada** → [Ver documentação](API_DOCUMENTATION_OPTIMIZED.md)
+- **GitHub Releases** (5MB) + **Pinecone** para busca vetorial
+- **Carregamento 20x mais rápido** (30s vs 10min)
+- **Ideal para**: Produção, demos, ambientes com recursos limitados como streamlit
+
+---
+
 ## Arquitetura do Sistema
 
 ```
