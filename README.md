@@ -27,10 +27,10 @@ Sistema que **automaticamente**:
 - Fornece análise detalhada de cada match
 
 ## Resultado
-[MVP Streamlit](https://decision-recruitment.streamlit.app/)
-[Video Oficial](https://youtu.be/iTiq8fg9nXI)
-[Gravação de Tela](https://youtu.be/3OOA-PyN87Q)
-![Demo do Sistema](assets/demo.gif)
+
+- [MVP Streamlit](https://decision-recruitment.streamlit.app/)
+- [Video Oficial](https://youtu.be/iTiq8fg9nXI)
+- [Gravação de Tela](https://youtu.be/3OOA-PyN87Q)
 
 ### Como Funciona
 
