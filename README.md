@@ -26,8 +26,10 @@ Sistema que **automaticamente**:
 - Recomenda os **7 candidatos mais compatíveis**
 - Fornece análise detalhada de cada match
 
-## Demonstração Rápida
-
+## Resultado
+[MVP Streamlit](https://decision-recruitment.streamlit.app/)
+[Video Oficial](https://youtu.be/iTiq8fg9nXI)
+[Gravação de Tela](https://youtu.be/3OOA-PyN87Q)
 ![Demo do Sistema](assets/demo.gif)
 
 ### Como Funciona
@@ -115,7 +117,7 @@ streamlit run app.py
 ### Execução do Processamento Completo
 
 ```bash
-# Processar dados completos (pode demorar ~30 minutos)
+# Processar dados completos (pode demorar +5 horas)
 python data_processing.py
 ```
 
@@ -167,24 +169,13 @@ decision-recruiter/
 ├── app.py                    # Aplicação Streamlit principal
 ├── data_processing.py        # Pipeline de processamento ML
 ├── requirements.txt          # Dependências do projeto
-├── src/                     # Código fonte modularizado
-├── docs/                    # Documentação técnica
-├── tests/                   # Testes automatizados
-└── assets/                  # Screenshots e recursos
+├── docs/                     # Documentação técnica
+├── mvp_oficial.py            # Versão do MVP de alta precisão 
+
 ```
 
-## Testes
-
-```bash
-# Executar testes unitários
-python -m pytest tests/
-
-# Verificar cobertura
-python -m pytest --cov=src tests/
-```
 ## Arquivo de Dados Processados
-O sistema utiliza um arquivo de embeddings pré-processados armazenado no Google Drive:
-🔗 Link direto: https://drive.google.com/file/d/1172CYnyderbEHOzdfjXJ1dWfglKvzW-e/view?usp=drive_link
+O sistema utiliza um arquivo de embeddings pré-processados armazenado no Google Drive: [Link direto](https://drive.google.com/file/d/1172CYnyderbEHOzdfjXJ1dWfglKvzW-e/view?usp=drive_link)
 
 ## Documentação Adicional
 
