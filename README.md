@@ -9,7 +9,7 @@
 
 ## Visão Geral
 
-O **Decision Recruiter** é uma aplicação de pós-graduação que otimiza o processo de triagem de candidatos para a empresa fictícia "Decision". Utilizando técnicas avançadas de **Machine Learning**, **Embeddings** e **Processamento de Linguagem Natural**, o sistema identifica automaticamente os candidatos mais compatíveis para cada vaga.
+O **Decision Recruiter** é uma aplicação de pós-graduação que otimiza o processo de triagem de candidatos para a empresa Decision. Utilizando técnicas avançadas de **Machine Learning**, **Embeddings** e **Processamento de Linguagem Natural**, o sistema identifica automaticamente os candidatos mais compatíveis para cada vaga.
 
 ### Problema Resolvido
 
